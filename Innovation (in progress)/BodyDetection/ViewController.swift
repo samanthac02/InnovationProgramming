@@ -19,27 +19,30 @@ class ViewController: UIViewController, ARSessionDelegate {
     let characterOffset: SIMD3<Float> = [-1.0, 0, 0] // Offset the character by one meter to the left
     let characterAnchor = AnchorEntity()
     
+    // Coordinate and joints data
     let joints = ["head_joint", "right_forearm_joint", "right_hand_joint", "right_upLeg_joint", "right_leg_joint", "right_toes_joint","left_forearm_joint", "left_hand_joint", "left_upLeg_joint", "left_leg_joint", "left_toes_joint"]
-    var coordinates: [ [ Float ] ] = []
+    var coordinates: [ [ Float ] ] = [[0.046, 0.001, 0], [-0.266, 0, 0], [-0.268, 0, 0], [-0.101, -0.025, 0.001], [-0.421, 0, 0], [-0.149, 0, 0], [0.266, 0, 0], [0.268, 0, 0], [0.101, -0.025, 0.001], [0.421, 0, 0], [0.149, 0, 0]]
     var tPose: [ [ Float ] ] = [[0.046, 0.001, 0], [-0.266, 0, 0], [-0.268, 0, 0], [-0.101, -0.025, 0.001], [-0.421, 0, 0], [-0.149, 0, 0], [0.266, 0, 0], [0.268, 0, 0], [0.101, -0.025, 0.001], [0.421, 0, 0], [0.149, 0, 0]]
+    
+    // Timer variables
+    var seconds = 60
+    var timer = Timer()
+    var isTimerRunning = false
+    
     
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         arView.session.delegate = self
-        
-        // If the iOS device doesn't support body tracking, raise a developer error for
-        // this unhandled case.
+
         guard ARBodyTrackingConfiguration.isSupported else {
             fatalError("This feature is only supported on devices with an A12 chip")
         }
 
-        // Run a body tracking configration.
         let configuration = ARBodyTrackingConfiguration()
         arView.session.run(configuration)
         
         arView.scene.addAnchor(characterAnchor)
-        
-        // Asynchronously load the 3D character.
+
         var cancellable: AnyCancellable? = nil
         cancellable = Entity.loadBodyTrackedAsync(named: "character/robot").sink(
             receiveCompletion: { completion in
@@ -63,26 +66,50 @@ class ViewController: UIViewController, ARSessionDelegate {
         for anchor in anchors {
             guard let bodyAnchor = anchor as? ARBodyAnchor else { continue }
             
-            // Update the position of the character anchor's position.
             let bodyPosition = simd_make_float3(bodyAnchor.transform.columns.3)
             characterAnchor.position = bodyPosition + characterOffset
-            // Also copy over the rotation of the body anchor, because the skeleton's pose
-            // in the world is relative to the body anchor's rotation.
             characterAnchor.orientation = Transform(matrix: bodyAnchor.transform).rotation
    
-            
+            // Records coordinate positions of joints
             for joint in joints {
                 let position = bodyAnchor.skeleton.localTransform(for: ARSkeleton.JointName(rawValue: "\(joint)"))![3]
-                var x = position[0]
-                var y = position[1]
-                var z = position[2]
-                coordinates.append([x, y, z])
+                var x = Float(round(1000 * (position[0]))/1000)
+                var y = Float(round(1000 * (position[1]))/1000)
+                var z = Float(round(1000 * (position[2]))/1000)
+                //coordinates.append([x, y, z])
                 
-                print("x:\(x), y:\(y), z:\(z)")
+                switch joint {
+                case "head_joint":
+                    coordinates[0] = [x, y, z]
+                case "right_forearm_joint":
+                    coordinates[1] = [x, y, z]
+                case "right_hand_joint":
+                    coordinates[2] = [x, y, z]
+                case "right_upLeg_joint":
+                    coordinates[3] = [x, y, z]
+                case "right_leg_joint":
+                    coordinates[4] = [x, y, z]
+                case "right_toes_joint":
+                    coordinates[5] = [x, y, z]
+                case "left_forearm_joint":
+                    coordinates[6] = [x, y, z]
+                case "left_hand_joint":
+                    coordinates[7] = [x, y, z]
+                case "left_upLeg_joint":
+                    coordinates[8] = [x, y, z]
+                case "left_leg_joint":
+                    coordinates[9] = [x, y, z]
+                case "left_toes_joint":
+                    coordinates[10] = [x, y, z]
+                default:
+                    print()
+                }
+                
+                //print("x:\(x), y:\(y), z:\(z)")
             }
             
-            print("coordinates: \(coordinates)")
-            coordinates = []
+            //print("coordinates: \(coordinates)")
+            //coordinates = []
             
             if let character = character, character.parent == nil {
                 // Attach the character to its anchor as soon as
@@ -91,7 +118,41 @@ class ViewController: UIViewController, ARSessionDelegate {
                 characterAnchor.addChild(character)
             }
         }
+        runTimer()
+        //print("------------")
+    }
+    
+    func runTimer() {
+        timer = Timer.scheduledTimer(timeInterval: 1, target: self, selector: (#selector(ViewController.updateTimer)), userInfo: nil, repeats: true)
         
-        print("------------")
+    }
+    
+    @objc func updateTimer() {
+        if seconds == 0 {
+            //compareCoordinates()
+            timer.invalidate()
+            compareCoordinates()
+            //seconds = 60
+        } else {
+            seconds -= 1
+        }
+        print("seconds left: \(seconds)")
+    }
+    
+    func compareCoordinates() {
+        /*for coordinate in coordinates {
+            //print(coordinate)
+            for c in coordinate {
+                print(c)
+            }
+        }*/
+        
+        for index in 0...10 {
+            //print(coordinates[index])
+            for i in 0...2 {
+                //print(coordinates[index][i])
+                print((tPose[index][i]) - (coordinates[index][i]))
+            }
+        }
     }
 }
